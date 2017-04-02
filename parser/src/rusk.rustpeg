@@ -1,0 +1,80 @@
+use super::*;
+use std::str::FromStr;
+#[pub]
+module -> Module = e:expdecl**delim {Module{expdecl:e}}
+expdecl -> ExpDecl = e:expression {ExpDecl::Exp(e)} / d:decl {ExpDecl::Decl(d)}
+
+decl -> Decl = t:typedecl {Decl::Typedecl(t)}
+typedecl -> Typedecl = "type" delim i:id delim "=" delim c:classdecl {Typedecl{id:i, class:c}}
+//class_tuple -> ClassTuple = c:classdecl {ClassTuple::Classdecl(c)} / t:tupledecl {ClassTuple::Tupledecl(t)}
+classdecl -> Classdecl = "class" delim "{" delim a:typeargs delim "}" {Classdecl{args:a}}
+//tupledecl -> Tupledecl = "{" delim a:typeargs delim "}" {Tupledecl{args:a}}
+
+expressions -> Vec<Expression> = expression++delim
+expression -> Expression = a:assign {Expression{assign:a}}
+
+assign -> Assign = i:assignop? c:comparative {Assign{id:i, comp:c}}
+assignop -> String = i:id delim "=" delim {i}
+
+comparative -> Comparative = l:additive c:comparer? {Comparative{lhs:l, rhs:c}}
+comparer -> Box<Comparer> = lt / le / eq / ne / gt / ge
+lt -> Box<Comparer> = delim "<" delim  r:additive {box Comparer{op:CompOp::Lt, add:r}}
+le -> Box<Comparer> = delim "<=" delim r:additive {box Comparer{op:CompOp::Le, add:r}}
+eq -> Box<Comparer> = delim "==" delim r:additive {box Comparer{op:CompOp::Eq, add:r}}
+ne -> Box<Comparer> = delim "!=" delim r:additive {box Comparer{op:CompOp::Ne, add:r}}
+gt -> Box<Comparer> = delim ">" delim  r:additive {box Comparer{op:CompOp::Gt, add:r}}
+ge -> Box<Comparer> = delim ">=" delim r:additive {box Comparer{op:CompOp::Ge, add:r}}
+
+additive -> Additive = l:multitive a:adder? {Additive{lhs:l, rhs:a}}
+adder -> Box<Adder> = add / sub
+add -> Box<Adder> = delim "+" delim r:additive {box Adder{op:AddOp::Add, add:r}}
+sub -> Box<Adder> = delim "-" delim r:additive {box Adder{op:AddOp::Sub, add:r}}
+
+multitive -> Multitive = l:unary m:multiplier? {Multitive{lhs:l, rhs:m}}
+multiplier -> Box<Multiplier> = mul / div 
+mul -> Box<Multiplier> = delim "*" delim r:multitive {box Multiplier{op:MulOp::Mul, mul:r}}
+div -> Box<Multiplier> = delim "/" delim r:multitive {box Multiplier{op:MulOp::Div, mul:r}}
+
+unary -> Unary = u:unaryop? p:primary {Unary{unaryop:u, primary:p}}
+unaryop -> String = s:sign delim {s}
+sign -> String = s:$("-" / "+") {s.to_string()}
+
+primary -> Primary ="(" delim e:expression delim ")" {Primary::Expression(box e)} / i:if_blk {Primary::If(i)} / w:while_blk {Primary::While(w)}/ f:funccall {Primary::Funccall(f)} / c:classinst {Primary::Classinst(c)} / v:varacc {Primary::Varacc(v)} / l:literal {Primary::Literal(l)}
+
+if_blk -> If = "if" delims c:expression delim "{" delim t:expressions delim "}" e:else_blk? {If{condition: box c, then_blk:t, else_blk:e }}
+else_blk -> Vec<Expression> = delim "else" "{" delim e:expressions delim "}" {e} 
+
+while_blk -> While = "while" delims c:expression delim "{" delim e:expressions delim "}" {While{condition: box c, exps: e}}
+//for_blk -> For = "for" delims a:expression delim "{" delim e:exp_control delim "}"
+
+varacc -> Varacc = i:id m:membacc? {Varacc{id:i, memb:m}}
+membacc -> Vec<i64> = "." m:decimal++"." {m}
+
+funccall -> Funccall = f:funcdef_id delim "(" delim p:params delim ")" delim {Funccall{f_id: f, params: p}}
+funcdef_id -> FuncdefID = f:funcdef {FuncdefID::Funcdef(f)} / i:id {FuncdefID::ID(i)}
+funcdef -> Funcdef = "func" delims i:id? delim "(" delim a:typeargs delim ")" delim r:ret? delim "{" delim e:expressions delim "}" {Funcdef{id: i, args: a, ret:r, exps: e}}
+ret -> String = "->" delim i:id {i}
+params -> Vec<Expression> = expression**comma
+args -> Vec<String> = id**comma
+typeargs -> Vec<TypeArg> = typearg**comma
+typearg -> TypeArg = a:id delim ":" delim t:id {TypeArg{arg:a, atype:t}}
+
+classinst -> Classinst = i:id delim "{" delim p:params delim "}" {Classinst{id:i, params:p}}
+//classdecl_id -> ClassdeclID = c:classdecl {ClassdeclID::Classdecl(c)} / i:id {ClassdeclID::ID(i)}
+
+id -> String = !keyword s:$([a-zA-Z_][a-zA-Z0-9_]*) {s.to_string()}
+
+literal -> Literal = f:float {Literal::Float(f)} / i:int {Literal::Int(i)} / d:funcdef {Literal::Funcdef(d)} / t:tuple {Literal::Tuple(t)} / a:array {Literal::Array(a)}
+float -> f64 = f:$( (("." [0-9]+) / ([0-9]+ "." ([0-9]*)?)) ("e" [0-9]+)?) { f64::from_str(f).unwrap() } 
+int -> i64 = (hex / octal / binary / decimal)
+decimal -> i64 = n:$([0-9]+) { n.parse().unwrap() }
+hex -> i64 = "0x" n:$([0-9a-fA-F]+) { i64::from_str_radix(n, 16).unwrap() }
+octal -> i64 = "0o" n:$([0-7]+) { i64::from_str_radix(n, 8).unwrap() }
+binary -> i64 = "0b" n:$([01]+) { i64::from_str_radix(n, 2).unwrap() }
+tuple -> Tuple = "{" delim p:params delim "}" {Tuple{params:p}}
+array -> Array = "[" delim p:params delim "]" {Array{params:p}}
+
+delims = ("\n" / " ")+
+delim = ("\n" / " ")*
+comma = delim "," delim
+keyword = "if" / "else" / "func" / "class" / "type" / "for" / "break" / "continue" / "while"

@@ -1,0 +1,8 @@
+[package]
+name = "llvm-gen"
+version = "0.1.0"
+authors = ["nmasuko <nmasuko62@gmail.com>"]
+
+[dependencies]
+parser = {path = "../parser"}
+llvm-sys = {version = "39.0.1"}

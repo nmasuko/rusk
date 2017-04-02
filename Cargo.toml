@@ -1,0 +1,9 @@
+[package]
+name = "rusk"
+version = "0.1.0"
+authors = ["nmasuko <nmasuko62@gmail.com>"]
+
+[dependencies]
+parser = {path = "parser"}
+llvm-gen = {path = "llvm-gen"}
+getopts = { version = "0.2.4" }

@@ -1,0 +1,8 @@
+[package]
+name = "parser"
+version = "0.1.0"
+authors = ["nmasuko <nmasuko62@gmail.com>"]
+
+[dependencies]
+peg = { version = "0.5.1" }
+peg-syntax-ext = { version = "0.5.0" }
